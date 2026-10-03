@@ -1,4 +1,4 @@
-"""Загрузка конфигурации проекта: переменные окружения и sources.yaml."""
+"""Загрузка конфигурации: .env локально, st.secrets в Streamlit Cloud."""
 from __future__ import annotations
 
 import os
@@ -24,44 +24,53 @@ EXAMPLES_DIR.mkdir(exist_ok=True)
 load_dotenv(ROOT_DIR / ".env")
 
 
+def _get_secret(name: str, default: str = "") -> str:
+    """Читает значение из Streamlit secrets, если доступно.
+
+    Локально st.secrets не работает - тогда возвращается значение из
+    переменных окружения (то есть из .env).
+    """
+    try:
+        import streamlit as st
+
+        if name in st.secrets:
+            return str(st.secrets[name])
+    except Exception:
+        pass
+    return os.getenv(name, default)
+
+
 def _env_list(name: str, default: str) -> list[str]:
-    """Читает список из строки, разделённой запятыми."""
-    raw = os.getenv(name, default)
+    raw = _get_secret(name, default)
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
 class Settings:
-    """Настройки пайплайна, считываются из переменных окружения."""
+    """Настройки пайплайна."""
 
-    # выбор провайдера
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gigachat")
+    LLM_PROVIDER: str = _get_secret("LLM_PROVIDER", "gigachat")
 
-    # GigaChat
-    GIGACHAT_CLIENT_ID: str = os.getenv("GIGACHAT_CLIENT_ID", "")
-    GIGACHAT_AUTH_KEY: str = os.getenv("GIGACHAT_AUTH_KEY", "")
-    GIGACHAT_SCOPE: str = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
-    GIGACHAT_MODEL: str = os.getenv("GIGACHAT_MODEL", "GigaChat")
+    GIGACHAT_CLIENT_ID: str = _get_secret("GIGACHAT_CLIENT_ID")
+    GIGACHAT_AUTH_KEY: str = _get_secret("GIGACHAT_AUTH_KEY")
+    GIGACHAT_SCOPE: str = _get_secret("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
+    GIGACHAT_MODEL: str = _get_secret("GIGACHAT_MODEL", "GigaChat")
 
-    # OpenRouter (резервный провайдер, работает только через VPN)
-    OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
+    OPENROUTER_API_KEY: str = _get_secret("OPENROUTER_API_KEY")
     OPENROUTER_MODELS: list[str] = _env_list(
         "OPENROUTER_MODELS",
-        "deepseek/deepseek-r1:free,"
-        "qwen/qwen3.6-plus:free,"
-        "google/gemma-4-26b-a4b-it:free,"
-        "meta-llama/llama-3.3-70b-instruct:free,"
-        "mistralai/mistral-small-3.2-24b-instruct:free",
+        "deepseek/deepseek-r1:free,qwen/qwen3.6-plus:free",
     )
 
-    # параметры пайплайна
-    TOP_K_ARTICLES: int = int(os.getenv("TOP_K_ARTICLES", "25"))
-    N_CLUSTERS: int = int(os.getenv("N_CLUSTERS", "5"))
-    EMBEDDING_MODEL: str = os.getenv(
+    TOP_K_ARTICLES: int = int(_get_secret("TOP_K_ARTICLES", "25"))
+    N_CLUSTERS: int = int(_get_secret("N_CLUSTERS", "5"))
+    EMBEDDING_MODEL: str = _get_secret(
         "EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2"
     )
-    EMBEDDING_WEIGHT: float = float(os.getenv("EMBEDDING_WEIGHT", "0.7"))
-    BM25_WEIGHT: float = float(os.getenv("BM25_WEIGHT", "0.3"))
-    ENABLE_LLM_CACHE: bool = os.getenv("ENABLE_LLM_CACHE", "true").lower() == "true"
+    EMBEDDING_WEIGHT: float = float(_get_secret("EMBEDDING_WEIGHT", "0.7"))
+    BM25_WEIGHT: float = float(_get_secret("BM25_WEIGHT", "0.3"))
+    ENABLE_LLM_CACHE: bool = (
+        _get_secret("ENABLE_LLM_CACHE", "true").lower() == "true"
+    )
 
     DEFAULT_INTERESTS: list[str] = [
         "КИИ",

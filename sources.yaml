@@ -1,0 +1,50 @@
+sources:
+  - name: SecurityLab
+    url: https://www.securitylab.ru/_Services/export/rss/all.xml
+    tags: [иб, уязвимости]
+    enabled: true
+
+  - name: Habr InfoSecurity
+    url: https://habr.com/ru/rss/hubs/infosecurity/all/
+    tags: [ит, иб]
+    enabled: true
+
+  - name: Habr Industrial
+    url: https://habr.com/ru/rss/hubs/industrial_tech/all/
+    tags: [промышленность, ит]
+    enabled: true
+
+  - name: Kaspersky ICS CERT
+    url: https://ics-cert.kaspersky.ru/feed/
+    tags: [асу тп, кии, иб]
+    enabled: true
+
+  - name: Positive Technologies
+    url: https://ptsecurity.com/ru-ru/about/news/rss/
+    tags: [иб, энергетика]
+    enabled: true
+
+  - name: CISA Advisories
+    url: https://www.cisa.gov/cybersecurity-advisories/all.xml
+    tags: [ics, scada, уязвимости]
+    enabled: true
+
+  - name: Bleeping Computer
+    url: https://www.bleepingcomputer.com/feed/
+    tags: [иб, уязвимости]
+    enabled: true
+
+  - name: Dark Reading
+    url: https://www.darkreading.com/rss.xml
+    tags: [иб, энергетика]
+    enabled: true
+
+  - name: The Record
+    url: https://therecord.media/feed
+    tags: [иб, кии]
+    enabled: true
+
+  - name: Security Affairs
+    url: https://securityaffairs.com/feed
+    tags: [иб, уязвимости]
+    enabled: true

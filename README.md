@@ -1,93 +1,316 @@
-# template-gitlab-82b4e17c
+# ИИ-помощник для ИТ/ИБ-дайджестов
 
-Template for task: GitLab репозиторий
+Прототип ИИ-ассистента, который собирает публикации из открытых источников,
+отбирает их по интересам пользователя, группирует по темам и формирует
+тематический дайджест в формате Markdown и DOCX.
 
-## Getting started
+Разработан в рамках хакатона «ИИ-ассистенты для энергетики».
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+---
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## Проблема
 
-## Add your files
+Специалисты по ИТ и информационной безопасности регулярно просматривают
+новости из десятков источников: вендорские алерты, блоги CERT, отраслевые
+медиа. Ручной отбор релевантных публикаций и их группировка по темам
+занимают 1–2 часа в день. При этом часть публикаций дублируется, часть
+устарела, а часть не относится к профессиональным интересам читателя.
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+## Решение
+
+ИИ-помощник автоматизирует этот процесс:
+
+1. Собирает публикации из 10+ открытых источников (RSS).
+2. Фильтрует устаревшее, удаляет дубликаты и почти-дубликаты.
+3. Ранжирует публикации по интересам пользователя с помощью гибридной
+   модели (BM25 + мультиязычные эмбеддинги).
+4. Группирует отобранные публикации по темам с помощью кластеризации.
+5. Генерирует осмысленные названия тем и краткие резюме через GigaChat.
+6. Формирует готовый дайджест в Markdown и DOCX.
+
+Время подготовки дайджеста сокращается с 1–2 часов до нескольких минут.
+
+---
+
+## Возможности
+
+- Сбор публикаций из 10+ RSS-источников по ИТ, ИБ, АСУ ТП и энергетике
+- Фильтрация по свежести (по умолчанию — публикации не старше 180 дней)
+- Дедупликация и удаление почти-дублей внутри одного источника
+- Гибридный ранкинг релевантности: BM25 + эмбеддинги
+  (модель `paraphrase-multilingual-MiniLM-L12-v2`)
+- Diversity reranking: не более 3 публикаций из одного источника в топе
+- Автоматический подбор числа тем по силуэту
+- Генерация названий тем через LLM с валидацией и fallback
+- Суммаризация публикаций через LLM с extractive fallback
+- Экспорт дайджеста в Markdown и DOCX
+- Веб-интерфейс на Streamlit и CLI-версия
+- Кэширование ответов LLM на диск (экономия токенов и времени)
+- Автоматическая ротация моделей OpenRouter при исчерпании лимитов
+  (резервный провайдер, работает через VPN)
+
+---
+
+## Архитектура
 
 ```
-cd existing_repo
-git remote add origin https://git.codenrock.com/codenrock/ii-assistenty/template-gitlab-82b4e17c.git
-git branch -M main
-git push -uf origin main
++-----------------+     +------------------+     +-----------------+
+|  sources.yaml   | --> |    Collector     | --> |   Cleaner       |
+|  (10+ RSS)      |     |  (feedparser)    |     |  + dedup        |
++-----------------+     +------------------+     +-----------------+
+                                                       |
+                                                       v
++-----------------+     +------------------+     +-----------------+
+|   Exporter      | <-- |    Clusterer     | <-- |    Ranker       |
+|  MD / DOCX      |     |  (KMeans + LLM)  |     |  (BM25 + emb)   |
++-----------------+     +------------------+     +-----------------+
+        ^                       ^
+        |                       |
+        |               +------------------+
+        |               |   Summarizer     |
+        |               |    (GigaChat)    |
+        |               +------------------+
+        |
++-----------------+
+|  Streamlit UI   |
++-----------------+
 ```
 
-## Integrate with your tools
+### Модули
 
-- [ ] [Set up project integrations](https://git.codenrock.com/codenrock/ii-assistenty/template-gitlab-82b4e17c/-/settings/integrations)
+| Файл | Назначение |
+|------|-----------|
+| `src/collector.py` | Загрузка RSS через feedparser и requests |
+| `src/cleaner.py` | Очистка HTML, нормализация URL, фильтр по свежести, дедупликация, удаление почти-дублей |
+| `src/ranker.py` | Гибридное ранжирование + diversity reranking |
+| `src/clusterer.py` | KMeans с подбором k по силуэту, генерация названий тем через LLM |
+| `src/summarizer.py` | LLM-суммаризация с extractive fallback |
+| `src/exporter.py` | Экспорт дайджеста в Markdown и DOCX |
+| `src/llm_client.py` | Универсальный клиент GigaChat / OpenRouter с ротацией и кэшем |
+| `src/storage.py` | SQLite-хранилище публикаций |
+| `src/embedder.py` | Обёртка над sentence-transformers |
+| `src/config.py` | Конфигурация из переменных окружения |
+| `src/models.py` | Модели данных: Article, Cluster, Digest |
+| `app.py` | Streamlit-интерфейс |
+| `run_cli.py` | CLI-версия без UI |
 
-## Collaborate with your team
+---
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+## Технологический стек
 
-## Test and Deploy
+- **Python 3.11**
+- **Сбор данных:** feedparser, requests, trafilatura, BeautifulSoup
+- **ML / NLP:** sentence-transformers, scikit-learn, rank-bm25, numpy
+- **LLM:** GigaChat API (основной), OpenRouter (резервный)
+- **Экспорт:** python-docx
+- **UI:** Streamlit
+- **Хранилище:** SQLite
+- **Утилиты:** tenacity, python-dotenv, PyYAML, tqdm
 
-Use the built-in continuous integration in GitLab.
+---
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+## Быстрый старт
 
-***
+### Требования
 
-# Editing this README
+- Python 3.11 или выше
+- Аккаунт на [developers.sber.ru](https://developers.sber.ru/studio)
+  для получения ключа GigaChat (бесплатно для физических лиц)
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### Установка
 
-## Suggestions for a good README
+```bash
+git clone <repo-url>
+cd digest-assistant
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate.bat
+# macOS / Linux:
+source .venv/bin/activate
 
-## Name
-Choose a self-explaining name for your project.
+pip install -r requirements.txt
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+Установка занимает 5–15 минут: скачивается PyTorch (~2 ГБ) как зависимость
+`sentence-transformers`.
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+### Получение ключа GigaChat
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+1. Зарегистрируйся на [developers.sber.ru/studio](https://developers.sber.ru/studio)
+   через Сбер ID.
+2. Создай проект (Personal workspace).
+3. Создай приложение типа **GigaChat API**.
+4. Скопируй:
+   - **Client ID** (строка вида `a1b2c3d4-...`)
+   - **Authorization Key** (длинная строка для заголовка `Authorization`)
+   - **Scope** (по умолчанию `GIGACHAT_API_PERS`)
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+### Настройка окружения
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+Создай файл `.env` в корне проекта:
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```env
+LLM_PROVIDER=gigachat
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+GIGACHAT_CLIENT_ID=твой_client_id
+GIGACHAT_AUTH_KEY=твой_authorization_key
+GIGACHAT_SCOPE=GIGACHAT_API_PERS
+GIGACHAT_MODEL=GigaChat
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+# Резервный провайдер (работает через VPN)
+OPENROUTER_API_KEY=
+OPENROUTER_MODELS=deepseek/deepseek-r1:free,qwen/qwen3.6-plus:free
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+TOP_K_ARTICLES=25
+N_CLUSTERS=5
+EMBEDDING_MODEL=paraphrase-multilingual-MiniLM-L12-v2
+EMBEDDING_WEIGHT=0.7
+BM25_WEIGHT=0.3
+ENABLE_LLM_CACHE=true
+```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### Проверка LLM
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+```bash
+python check_llm.py
+```
 
-## License
-For open source projects, say how it is licensed.
+Ожидаемый вывод: провайдер `gigachat`, осмысленный ответ модели
+на русском языке.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+### Запуск CLI-версии
+
+```bash
+python run_cli.py \
+  --interests "КИИ, АСУ ТП, уязвимости SCADA, импортозамещение" \
+  --top-k 25 \
+  --clusters 5
+```
+
+Результат сохранится в `examples/digest_YYYYMMDD_HHMMSS.md` и `.docx`.
+
+Чтобы отключить LLM-суммаризацию (быстрее, но менее качественно):
+
+```bash
+python run_cli.py --no-llm-summary
+```
+
+### Запуск веб-интерфейса
+
+```bash
+streamlit run app.py
+```
+
+Откроется браузер на `http://localhost:8501`. Введи интересы через запятую,
+настрой число публикаций и тем, нажми «Собрать дайджест».
+
+---
+
+## Примеры
+
+В папке `examples/`:
+
+- `digest_interests_A.md` / `.docx` — дайджест по интересам
+  **«КИИ, АСУ ТП, уязвимости SCADA, импортозамещение, ИБ в энергетике»**.
+  Темы: «Угрозы и уязвимости в промышленной ИТ»,
+  «Уязвимости SCADA/ICS и ИБ инфраструктуры».
+  Источники: Kaspersky ICS CERT, CISA, Habr InfoSecurity, Bleeping Computer.
+
+- `digest_interests_B.md` / `.docx` — дайджест по интересам
+  **«импортозамещение, ГОСТ, регуляторика»**.
+  Темы: «Темы ИБ и ИТ-практик», «Обновления и кибербезопасность IT-решений».
+  Источники: Habr InfoSecurity, CISA, Kaspersky ICS CERT, Security Affairs.
+
+Сравнение двух файлов демонстрирует, что при изменении интересов
+пользователя кардинально меняются и содержание, и темы, и источники.
+
+### Скриншоты
+
+Скриншоты интерфейса находятся в `docs/screenshots/`:
+
+- `01_main_screen.png` — главный экран Streamlit
+- `02_digest_interests_A.png` — результат при интересах «КИИ, АСУ ТП»
+- `03_digest_interests_B.png` — результат при интересах
+  «импортозамещение, ГОСТ, регуляторика»
+
+---
+
+## Структура проекта
+
+```
+digest-assistant/
+├── README.md
+├── requirements.txt
+├── .gitignore
+├── .env.example
+├── .env                     # локальные секреты, не коммитится
+├── sources.yaml             # список RSS-источников
+│
+├── app.py                   # Streamlit UI
+├── run_cli.py               # CLI
+├── check_llm.py             # проверка LLM
+│
+├── src/
+│   ├── __init__.py
+│   ├── config.py
+│   ├── models.py
+│   ├── llm_client.py
+│   ├── collector.py
+│   ├── cleaner.py
+│   ├── storage.py
+│   ├── embedder.py
+│   ├── ranker.py
+│   ├── clusterer.py
+│   ├── summarizer.py
+│   └── exporter.py
+│
+├── examples/                # примеры дайджестов для сдачи
+│   ├── digest_interests_A.md
+│   ├── digest_interests_A.docx
+│   ├── digest_interests_B.md
+│   └── digest_interests_B.docx
+│
+├── docs/
+│   └── screenshots/
+│       ├── 01_main_screen.png
+│       ├── 02_digest_interests_A.png
+│       └── 03_digest_interests_B.png
+│
+├── data/                    # SQLite и кэш LLM (создаётся автоматически)
+│
+└── tests/                   # модульные тесты
+```
+
+---
+
+## Ограничения
+
+- Используются только открытые RSS-источники. Платные и закрытые API (например, отраслевые базы данных) не подключены.
+- Персонализация выполняется по явно заданным интересам. История чтения пользователя и обратная связь (лайки/дизлайки) не учитываются.
+- LLM-суммаризация ограничена дневным лимитом GigaChat. На бесплатном тарифе физического лица дневной лимит обычно не достигается, но при больших объёмах возможны задержки.
+- Кластеризация на малой выборке (менее 10 публикаций) может давать
+  нестабильные результаты: подбор числа тем по силуэту чувствителен к шуму.
+- Названия тем и резюме генерируются LLM и могут содержать неточности. В критичных сценариях требуется проверка редактором.
+- Источник Positive Technologies и несколько западных изданий (Dark Reading, The Record) блокируют запросы из РФ. 
+  Они отключены или периодически недоступны, но это не влияет на общее качество дайджеста.
+- Нет авторизации, многопользовательского режима и развёртывания в облаке. Прототип запускается локально.
+
+---
+
+## Дальнейшее развитие
+
+- Обратная связь от пользователя и обучение персональной модели ранжирования.
+- Подключение Telegram-бота и рассылки дайджеста по расписанию.
+- Поддержка дополнительных форматов экспорта (PDF, HTML-письмо).
+- Расширение списка источников: отраслевые Telegram-каналы,
+  российские регуляторы, вендорские блоги.
+- Развертывание в Docker с готовым compose-файлом.
+- Переход на более крупную модель эмбеддингов
+  (`paraphrase-multilingual-mpnet-base-v2`) при наличии GPU.
+
+---
+
+## Команда
+
+Pierpoint: Гаврилова Анна, Гаврилова Юлия
